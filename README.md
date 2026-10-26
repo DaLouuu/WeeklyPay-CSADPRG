@@ -14,9 +14,10 @@ An automated, multi-paradigm Weekly Payroll System developed for **CSADPRG (Comp
 3. [Language Implementations & Paradigms](#-language-implementations--paradigms)
 4. [Frontend Evaluation](#-frontend-evaluation)
 5. [Code Audit & Resolved Issues](#-code-audit--resolved-issues)
-6. [Suggested Folder Hierarchy](#-suggested-folder-hierarchy)
+6. [Project Folder Hierarchy](#-project-folder-hierarchy)
 7. [How to Run](#-how-to-run)
-8. [Sample Input & Output](#-sample-input--output)
+8. [Automated Verification Tests](#-automated-verification-tests)
+9. [Sample Input & Output](#-sample-input--output)
 
 ---
 
@@ -62,12 +63,12 @@ This repository implements a **menu-driven Weekly Payroll System** that accepts 
 
 ## 💻 Language Implementations & Paradigms
 
-| Language | Directory | Paradigm / Focus | Key Concepts Demonstrated |
+| Language | Location | Paradigm / Focus | Key Concepts Demonstrated |
 | :--- | :--- | :--- | :--- |
-| **Go** | `Go-Payroll/main.go` | Procedural / Concurrent / Systems | Structs, slices, procedural pipelines, strong typing, zero-cost abstractions |
-| **Kotlin** | `mco1_v1.kt` | Modern OOP / Functional | Type safety, null safety, data classes, expression evaluation |
-| **Ruby** | `PLs/Ruby/MP_2_Ruby.rb` | Pure Object-Oriented / Dynamic | Class-based models (`Worker`, `Workday`), encapsulation, dynamic dispatch |
-| **R** | `PLs/R/payroll.R` | Functional / Vectorized / Statistical | Named lists, vector indexing, functional transformations |
+| **Go** | [`src/go/main.go`](src/go/main.go) | Procedural / Concurrent / Systems | Structs, slices, procedural pipelines, strong typing, zero-cost abstractions |
+| **Kotlin** | [`src/kotlin/main.kt`](src/kotlin/main.kt) | Modern OOP / Functional | Type safety, null safety, data classes, expression evaluation |
+| **Ruby** | [`src/ruby/main.rb`](src/ruby/main.rb) | Pure Object-Oriented / Dynamic | Class-based models (`Worker`, `Workday`), encapsulation, dynamic dispatch |
+| **R** | [`src/r/main.R`](src/r/main.R) | Functional / Vectorized / Statistical | Named lists, vector indexing, functional transformations |
 
 ---
 
@@ -75,8 +76,7 @@ This repository implements a **menu-driven Weekly Payroll System** that accepts 
 
 ### Does this project have a Frontend?
 - **Current Status: No graphical or web frontend exists.**
-- All implementations (`Go-Payroll/main.go`, `mco1_v1.kt`, `PLs/Ruby/MP_2_Ruby.rb`, and `PLs/R/payroll.R`) are **pure Command-Line Interface (CLI) / terminal menu-driven applications**.
-- This satisfies the original CSADPRG course specifications, which mandated a terminal menu interface.
+- All implementations are **pure Command-Line Interface (CLI) / terminal menu-driven applications**, conforming to the CSADPRG course specification requirements.
 
 ### Recommended Frontend Enhancements (Optional Roadmap)
 If expanding beyond the console terminal:
@@ -89,7 +89,7 @@ If expanding beyond the console terminal:
 
 During code review and testing, several critical defects and discrepancies were identified and resolved across the implementations:
 
-### 1. Go Implementation (`Go-Payroll/main.go`)
+### 1. Go Implementation (`src/go/main.go`)
 - ❌ **Duplicate Menu Option & Crash**: Menu displayed option 2 as `Generate Pay Roll`, but selecting 2 immediately terminated the application (`Exit`), while option 3 threw an invalid choice error.
   - ✅ **Fixed**: Standardized menu options (1: Generate Payroll, 2: Update Settings, 3: Exit).
 - ❌ **Skipped Workdays**: The loop ran `for day := 5; day <= 7; day++`, skipping Days 1 through 4 entirely.
@@ -99,7 +99,7 @@ During code review and testing, several critical defects and discrepancies were 
 - ❌ **Missing Weekly Summary**: Daily pay was printed but weekly totals and present-day counters were never accumulated.
   - ✅ **Fixed**: Added complete summary tracking regular days present, rest days present, overtime hours split, and weekly gross total.
 
-### 2. Kotlin Implementation (`mco1_v1.kt`)
+### 2. Kotlin Implementation (`src/kotlin/main.kt`)
 - ❌ **Base Salary Calculation Bug**: Lines 212–215 added `(dailyRate / 8) * getRateNoOT()` to regular days with 0 overtime, awarding 562.50 PHP instead of 500.00 PHP for standard 8-hour days.
   - ✅ **Fixed**: Base pay correctly computes `dailyRate * multiplier`.
 - ❌ **Absence Compensation Bug**: Unworked normal days still defaulted to 500.00 PHP.
@@ -107,20 +107,19 @@ During code review and testing, several critical defects and discrepancies were 
 - ❌ **Rate Key Incompatibilities**: Missing lookups for `rhr` and `snwh`.
   - ✅ **Fixed**: Added complete mapping for all holiday and rest day combinations.
 
-### 3. Ruby Implementation (`PLs/Ruby/MP_2_Ruby.rb`)
+### 3. Ruby Implementation (`src/ruby/main.rb`)
 - ❌ **Off-by-One Day Indexing**: Loop called `retrieve_workday(day - 1)`, while `retrieve_workday` already subtracted 1 (`@workdays[day - 1]`). For Day 1, this accessed `@workdays[-1]` (Day 7).
   - ✅ **Fixed**: Passed 1-based `day` to `retrieve_workday(day)`.
 - ❌ **Boundary Flaw at 22:00**: Shifts ending exactly at `2200` failed both `< 2200` and `> 2200` checks, omitting 4 hours of valid overtime.
   - ✅ **Fixed**: Adjusted boundary to `>= 2200`.
 - ❌ **Rate Multiplier Typo**: Rest Day Night Shift rate was listed as `1.869` instead of `1.859`.
   - ✅ **Fixed**: Corrected rate to `1.859`.
-- ❌ **Stray Artifact**: Removed `tempCodeRunnerFile.rb` created by the VS Code runner.
 
 ---
 
-## 📂 Suggested Folder Hierarchy
+## 📂 Project Folder Hierarchy
 
-To transition from ad-hoc language directories to an industry-standard, maintainable project structure, the following hierarchy is recommended:
+The project is structured according to an industry-standard, clean, and modular folder layout:
 
 ```text
 WeeklyPay-CSADPRG/
@@ -142,6 +141,9 @@ WeeklyPay-CSADPRG/
 │   └── r/                                  # R implementation
 │       └── main.R
 │
+├── tests/                                  # Verification test suites
+│   └── verify_payroll.py                   # Automated rule & calculation validator
+│
 ├── .gitignore                              # Excludes binary builds, runner files, and logs
 └── README.md                               # Comprehensive system documentation
 ```
@@ -152,26 +154,51 @@ WeeklyPay-CSADPRG/
 
 ### Go
 ```bash
-cd Go-Payroll
+cd src/go
 go run main.go
 ```
 
 ### Kotlin
 ```bash
-kotlinc mco1_v1.kt -include-runtime -d payroll.jar
+cd src/kotlin
+kotlinc main.kt -include-runtime -d payroll.jar
 java -jar payroll.jar
 ```
 
 ### Ruby
 ```bash
-cd PLs/Ruby
-ruby MP_2_Ruby.rb
+cd src/ruby
+ruby main.rb
 ```
 
 ### R
 ```bash
-cd PLs/R
-Rscript payroll.R
+cd src/r
+Rscript main.R
+```
+
+---
+
+## 🧪 Automated Verification Tests
+
+An automated test script is provided in `tests/verify_payroll.py` to validate business rules and mathematical formulas across shifts and day classifications:
+
+```bash
+python tests/verify_payroll.py
+```
+
+Expected output:
+```text
+Running Weekly Payroll System verification suite...
+PASS: test_standard_workday
+PASS: test_day_overtime
+PASS: test_night_shift_overtime
+PASS: test_rest_day_worked
+PASS: test_regular_holiday
+PASS: test_absence
+PASS: test_weekly_summary_sample
+
+All 7 test suites passed successfully!
 ```
 
 ---
