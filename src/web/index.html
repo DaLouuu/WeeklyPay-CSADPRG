@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WeeklyPay - CSADPRG Weekly Payroll Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">WeeklyPay <span class="badge">CSADPRG</span></h1>
+          <p class="brand-subtitle">Automated Multi-Paradigm Labor Payroll Engine</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-load-spec-sample" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+          </svg>
+          Load Spec Sample
+        </button>
+        <button id="btn-reset" class="btn btn-secondary">Reset Week</button>
+        <button id="btn-export" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export Summary
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="dashboard-grid">
+      <!-- Timesheet Section -->
+      <section class="card timesheet-card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Weekly Timesheet Configuration</h2>
+            <p class="card-description">Modify start/out times (HHMM military time) and day classifications</p>
+          </div>
+          <div class="employee-meta">
+            <label for="employee-name">Employee:</label>
+            <input type="text" id="employee-name" value="Dana Louise" class="text-input-sm" />
+            <label for="daily-rate-input" style="margin-left: 12px;">Daily Rate (PHP):</label>
+            <input type="number" id="daily-rate-input" value="500.00" step="50" min="100" class="text-input-sm" style="width: 90px;" />
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="timesheet-table" id="timesheet-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Classification</th>
+                <th>IN Time</th>
+                <th>OUT Time</th>
+                <th>Net Work</th>
+                <th>OT (Day / Night)</th>
+                <th>Daily Earnings</th>
+              </tr>
+            </thead>
+            <tbody id="days-table-body">
+              <!-- Rendered dynamically by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Payroll Summary & Statistics Card -->
+      <aside class="card summary-card">
+        <div class="card-header">
+          <h2 class="card-title">Payroll Summary</h2>
+          <span class="badge badge-success">Live Calculation</span>
+        </div>
+
+        <div class="total-pay-box">
+          <span class="total-label">Total Weekly Gross Pay</span>
+          <div class="total-amount" id="total-weekly-pay">₱0.00</div>
+          <span class="total-sub">Net of tax & automated wage matrix</span>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <span class="metric-title">Regular Days Present</span>
+            <span class="metric-value" id="stat-reg-days">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-title">Rest Days Present</span>
+            <span class="metric-value" id="stat-rest-days">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-title">Daytime OT (18:00–22:00)</span>
+            <span class="metric-value" id="stat-day-ot">0 hrs</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-title">Night Shift OT (22:00–06:00)</span>
+            <span class="metric-value" id="stat-night-ot">0 hrs</span>
+          </div>
+        </div>
+
+        <div class="summary-breakdown">
+          <h3 class="breakdown-title">Computation Breakdown</h3>
+          <ul class="breakdown-list">
+            <li><span>Base Hourly Rate</span><strong id="hourly-rate-disp">₱62.50 / hr</strong></li>
+            <li><span>Total Overtime Rendered</span><strong id="total-ot-disp">0 (0) hrs</strong></li>
+            <li><span>Regular Base Pay Subtotal</span><strong id="base-pay-subtotal">₱0.00</strong></li>
+            <li><span>Overtime Premium Subtotal</span><strong id="ot-pay-subtotal">₱0.00</strong></li>
+          </ul>
+        </div>
+
+        <div class="spec-rules-box">
+          <h4>Philippine Labor Standards Rules</h4>
+          <p>• 1-hour unpaid meal break deducted for shifts &gt; 4 hrs.</p>
+          <p>• Overtime beyond 4 hours shifts into 10% Night Shift Differential (DIFF).</p>
+          <p>• Absence (OUT = IN) earns ₱0.00 on normal days.</p>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Multi-Language Execution Guide Section -->
+    <section class="card engines-card">
+      <div class="card-header">
+        <h2 class="card-title">Multi-Paradigm Engine Architecture</h2>
+        <span class="badge">Go • Kotlin • Ruby • R</span>
+      </div>
+      <div class="engines-grid">
+        <div class="engine-box">
+          <div class="engine-header">
+            <span class="engine-name">Go Engine</span>
+            <span class="engine-tag">Procedural / Systems</span>
+          </div>
+          <p class="engine-desc">Strongly typed procedural pipeline with military time parsing and high-throughput execution.</p>
+          <code>cd src/go &amp;&amp; go run main.go</code>
+        </div>
+        <div class="engine-box">
+          <div class="engine-header">
+            <span class="engine-name">Kotlin Engine</span>
+            <span class="engine-tag">OOP / Functional</span>
+          </div>
+          <p class="engine-desc">Object-oriented model utilizing data classes, when-expressions, and null safety guarantees.</p>
+          <code>cd src/kotlin &amp;&amp; kotlinc main.kt -include-runtime -d payroll.jar</code>
+        </div>
+        <div class="engine-box">
+          <div class="engine-header">
+            <span class="engine-name">Ruby Engine</span>
+            <span class="engine-tag">Dynamic OOP</span>
+          </div>
+          <p class="engine-desc">Encapsulated Worker and Workday objects with dynamic dispatch and expressive CLI menus.</p>
+          <code>cd src/ruby &amp;&amp; ruby main.rb</code>
+        </div>
+        <div class="engine-box">
+          <div class="engine-header">
+            <span class="engine-name">R Engine</span>
+            <span class="engine-tag">Vectorized / Stats</span>
+          </div>
+          <p class="engine-desc">Functional implementation with named rate lists, vector math, and statistical reporting.</p>
+          <code>cd src/r &amp;&amp; Rscript main.R</code>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>WeeklyPay-CSADPRG • Comparative Study of Programming Languages • De La Salle University</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

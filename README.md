@@ -69,19 +69,21 @@ This repository implements a **menu-driven Weekly Payroll System** that accepts 
 | **Kotlin** | [`src/kotlin/main.kt`](src/kotlin/main.kt) | Modern OOP / Functional | Type safety, null safety, data classes, expression evaluation |
 | **Ruby** | [`src/ruby/main.rb`](src/ruby/main.rb) | Pure Object-Oriented / Dynamic | Class-based models (`Worker`, `Workday`), encapsulation, dynamic dispatch |
 | **R** | [`src/r/main.R`](src/r/main.R) | Functional / Vectorized / Statistical | Named lists, vector indexing, functional transformations |
+| **Web** | [`src/web/`](src/web/) | Interactive UI / Reactive Client | Vanilla HTML5/CSS3/ES6, dark glassmorphism, real-time wage recalculation |
 
 ---
 
-## 🖥️ Frontend Evaluation
+## 🖥️ Frontend Overview
 
-### Does this project have a Frontend?
-- **Current Status: No graphical or web frontend exists.**
-- All implementations are **pure Command-Line Interface (CLI) / terminal menu-driven applications**, conforming to the CSADPRG course specification requirements.
+### Interactive Web Dashboard (`src/web/`)
+While the primary CSADPRG academic submissions are CLI-driven console engines (Go, Kotlin, Ruby, and R), this repository includes a dedicated, zero-dependency **Web Frontend Dashboard** located in [`src/web/`](src/web/).
 
-### Recommended Frontend Enhancements (Optional Roadmap)
-If expanding beyond the console terminal:
-1. **Web Dashboard**: A lightweight frontend built with HTML5, CSS3, and JavaScript or React with Vite, displaying a weekly calendar timecard grid with instant gross pay recalculation.
-2. **Desktop GUI**: A cross-platform desktop UI using Kotlin Desktop (Compose) or Go Fyne.
+**Features**:
+- **Interactive Timesheet Grid**: Configure IN / OUT times (HHMM) and day classifications per day of the week.
+- **Instant Reactive Recalculation**: Dynamically updates base pay, day OT, night shift OT, and gross totals.
+- **Spec Sample Loader**: One-click preset to load the course reference input and verify results against expected output.
+- **Summary Export**: Copies formatted weekly payroll breakdown report directly to clipboard.
+- **Premium Design System**: Glassmorphism aesthetic, sleek dark mode palette, and accessible typography.
 
 ---
 
@@ -130,7 +132,7 @@ WeeklyPay-CSADPRG/
 │   └── samples/                            # Input & output reference transcripts
 │       └── input-output.txt
 │
-├── src/                                    # Source code segregated by language
+├── src/                                    # Source code segregated by language & client
 │   ├── go/                                 # Go implementation
 │   │   ├── main.go
 │   │   └── go.mod
@@ -138,8 +140,12 @@ WeeklyPay-CSADPRG/
 │   │   └── main.kt
 │   ├── ruby/                               # Ruby implementation
 │   │   └── main.rb
-│   └── r/                                  # R implementation
-│       └── main.R
+│   ├── r/                                  # R implementation
+│   │   └── main.R
+│   └── web/                                # Interactive Web Frontend
+│       ├── index.html                      # Semantic UI structure
+│       ├── styles.css                      # Modern dark glassmorphism styling
+│       └── app.js                          # Reactive timesheet & wage calculation logic
 │
 ├── tests/                                  # Verification test suites
 │   └── verify_payroll.py                   # Automated rule & calculation validator
@@ -152,26 +158,36 @@ WeeklyPay-CSADPRG/
 
 ## 🚀 How to Run
 
-### Go
+### Web Frontend Dashboard
+Simply open the HTML file in any browser, or serve it locally:
+```bash
+# Direct browser launch:
+# Open src/web/index.html in Chrome, Edge, or Firefox
+
+# Or using a local HTTP server:
+npx serve src/web
+```
+
+### Go Engine
 ```bash
 cd src/go
 go run main.go
 ```
 
-### Kotlin
+### Kotlin Engine
 ```bash
 cd src/kotlin
 kotlinc main.kt -include-runtime -d payroll.jar
 java -jar payroll.jar
 ```
 
-### Ruby
+### Ruby Engine
 ```bash
 cd src/ruby
 ruby main.rb
 ```
 
-### R
+### R Engine
 ```bash
 cd src/r
 Rscript main.R
