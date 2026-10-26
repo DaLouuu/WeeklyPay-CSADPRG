@@ -12,270 +12,325 @@ import (
 type Configuration struct {
 	DailySalary      float64
 	RegularWorkHours int
+	WorkdaysPerWeek  int
+	RestDaysPerWeek  int
 }
 
-const (
-	RegularShiftStart = 900
-	RegularShiftEnd   = 2200
-	NightShiftStart   = 2200
-	NightShiftEnd     = 600
-)
+// Rates holds multipliers for regular pay and overtime
+type DayRates struct {
+	BaseMultiplier float64
+	DayOTRate      float64
+	NightOTRate    float64
+}
+
+var RateMatrix = map[string]DayRates{
+	"NORMAL": {
+		BaseMultiplier: 1.00,
+		DayOTRate:      1.25,
+		NightOTRate:    1.375,
+	},
+	"REST": {
+		BaseMultiplier: 1.30,
+		DayOTRate:      1.69,
+		NightOTRate:    1.859,
+	},
+	"SNWH": {
+		BaseMultiplier: 1.30,
+		DayOTRate:      1.69,
+		NightOTRate:    1.859,
+	},
+	"SNWHR": {
+		BaseMultiplier: 1.50,
+		DayOTRate:      1.95,
+		NightOTRate:    2.145,
+	},
+	"RH": {
+		BaseMultiplier: 2.00,
+		DayOTRate:      2.60,
+		NightOTRate:    2.860,
+	},
+	"RHR": {
+		BaseMultiplier: 2.60,
+		DayOTRate:      3.38,
+		NightOTRate:    3.718,
+	},
+}
 
 func isValidTimeFormat(timeStr string) bool {
-	if timeStr == "0000" {
-		return true
+	if len(timeStr) != 4 {
+		return false
 	}
-
 	_, err := time.Parse("1504", timeStr)
 	return err == nil
 }
 
-// This function is for calculating the overtime salary for Regular Days
-func calculateOvertimeSalary(overTime int, hourlyRate float64, isNightShiftOT bool, nightOverTime int, holidayType string) float64 {
-	overtimeRate := 1.25
-	if isNightShiftOT {
-		overtimeRate = 1.375 // Adjust the night shift overtime rate
-		return float64(nightOverTime)*hourlyRate*overtimeRate + 312.50
-	}
-	if holidayType == "HD" {
-		overtimeRate := 2.6
-		return float64(overTime) * hourlyRate * overtimeRate
-	}
-
-	return float64(overTime) * hourlyRate * overtimeRate
+func parseMilitaryMinutes(timeStr string) int {
+	h, _ := strconv.Atoi(timeStr[:2])
+	m, _ := strconv.Atoi(timeStr[2:])
+	return h*60 + m
 }
 
-func calculateOvertimeSalaryRestDay(overTime int, hourlyRate float64, isNightShiftOT bool, nightOverTime int) float64 {
-	overtimeRate := 1.69
-	if isNightShiftOT {
-		overtimeRate = 1.859 // Adjust the night shift overtime rate
-		return float64(nightOverTime)*hourlyRate*overtimeRate + 422.50
-	}
-
-	return float64(overTime) * hourlyRate * overtimeRate
+type DailyResult struct {
+	DayNumber       int
+	IsRestDay       bool
+	IsAbsent        bool
+	DayType         string
+	WorkHours       int
+	WorkMinutes     int
+	DayOTHours      int
+	NightOTHours    int
+	Salary          float64
 }
 
-func calculateNightShiftHours(startTime, endTime string) int {
-	// Convert start and end times to integers
-	startTimeInt, _ := strconv.Atoi(startTime)
-	endTimeInt, _ := strconv.Atoi(endTime)
+func calculateDayPayroll(config Configuration, day int, inTime, outTime, holidayType string) DailyResult {
+	hourlyRate := config.DailySalary / float64(config.RegularWorkHours)
+	isRestDay := day > config.WorkdaysPerWeek
 
-	// If end time is "0000," adjust it to "2400"
-	if endTimeInt == 0 {
-		endTimeInt = 2400
-	}
-
-	// Check if the start time is after 2200 (considered as night shift start)
-	if startTimeInt >= 2200 {
-		// Calculate the night shift hours between 2200 and the end time
-		nightShiftHours := endTimeInt - 2200
-		if nightShiftHours < 0 {
-			nightShiftHours += 2400
+	// Determine Day Key
+	dayKey := "NORMAL"
+	if isRestDay {
+		if holidayType == "RH" {
+			dayKey = "RHR"
+		} else if holidayType == "SNWH" {
+			dayKey = "SNWHR"
+		} else {
+			dayKey = "REST"
 		}
-		return nightShiftHours
-	} else if startTimeInt < 2200 && endTimeInt < 600 {
-		// Check if the shift spans across midnight
-		// Calculate the night shift hours between 2200 and 0600
-		nightShiftHours := endTimeInt + (2400 - 2200)
-		return nightShiftHours
-	}
-
-	return 0 // No night shift hours if start time is before 2200 and end time is after 0600
-}
-
-func generatePayroll(config Configuration, day int, employeeName string, startTime string, endTime string, holidayType string) {
-	fmt.Printf("\nGenerating Pay Roll for Day %d...\n", day)
-
-	isHoliday := holidayType != ""
-	isRestDay := day == 6 || day == 7
-
-	duration, err := calculateDuration(startTime, endTime)
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-
-	workHours := int(duration.Hours()) - 1
-	if workHours < 0 {
-		workHours += 24
-	}
-
-	minutes := int(duration.Minutes()) % 60
-	if endTime == "0000" {
-		minutes += 1
-		if minutes == 60 {
-			minutes = 0
-			workHours += 1
+	} else {
+		if holidayType == "RH" {
+			dayKey = "RH"
+		} else if holidayType == "SNWH" {
+			dayKey = "SNWH"
+		} else {
+			dayKey = "NORMAL"
 		}
 	}
 
-	fmt.Printf("Employee: %s\n", employeeName)
-	fmt.Printf("Work Duration: %d hours %d minutes\n", workHours, minutes)
+	rates := RateMatrix[dayKey]
 
-	overTime := workHours - config.RegularWorkHours
-	isNightShiftOT := false
-	nightOverTime := 0
-	/**------------------------------  HOLIDAY -----------------------------------------------------------***/
-	if !isRestDay && overTime <= 4 && startTime == "0900" && holidayType == "HD" && isHoliday { // Regular Day with OT - Non-Night Shift
-		fmt.Println("=================================")
-		overtimeSalary := calculateOvertimeSalary(overTime, config.DailySalary/float64(config.RegularWorkHours), isNightShiftOT, nightOverTime, holidayType)
-		fmt.Printf("Daily Rate: %.2f\n", config.DailySalary)
-		fmt.Printf("Hours Overtime (Night Shift Overtime): %d (%d)\n", overTime, nightOverTime)
-		fmt.Printf("Salary for the day: %.2f\n", overtimeSalary+config.DailySalary)
-		fmt.Println("\n=================================")
+	// Check absence: when OUT time is 0900 (same as IN time)
+	if outTime == inTime {
+		salary := 0.0
+		if isRestDay {
+			// Per spec: On rest days, absent employees get regular daily salary
+			salary = config.DailySalary
+		}
+		return DailyResult{
+			DayNumber:    day,
+			IsRestDay:    isRestDay,
+			IsAbsent:     true,
+			DayType:      dayKey,
+			WorkHours:    0,
+			WorkMinutes:  0,
+			DayOTHours:   0,
+			NightOTHours: 0,
+			Salary:       salary,
+		}
 	}
 
-	/**------------------------------  REST DAYS -----------------------------------------------------------***/
-
-	if isRestDay && overTime <= 4 && startTime == "0900" && !isHoliday { // Rest Day with OT - Non-Night Shift
-		fmt.Println("==================================")
-		overtimeSalary := calculateOvertimeSalaryRestDay(overTime, config.DailySalary/float64(config.RegularWorkHours), isNightShiftOT, nightOverTime)
-		fmt.Printf("Daily Rate: %.2f\n", config.DailySalary)
-		fmt.Printf("Hours Overtime (Night Shift Overtime): %d (%d)\n", overTime, nightOverTime)
-		fmt.Printf("Salary for the day: %.2f\n", overtimeSalary+config.DailySalary)
-		fmt.Println("\n=================================")
+	inMin := parseMilitaryMinutes(inTime)
+	outMin := parseMilitaryMinutes(outTime)
+	if outMin < inMin {
+		outMin += 24 * 60 // Spans into next day
 	}
 
-	if isRestDay && overTime > 4 && startTime == "0900" && !isHoliday { // Rest Day with OT - Night Shift
-		isNightShiftOT = true
-		nightOverTime = overTime - 4
-		overTime = 4
-		overtimeSalary := calculateOvertimeSalaryRestDay(overTime, config.DailySalary/float64(config.RegularWorkHours), isNightShiftOT, nightOverTime)
-		fmt.Println("=================================")
-		fmt.Printf("Daily Rate: %.2f\n", config.DailySalary)
-		fmt.Printf("Hours Overtime (Night Shift Overtime): %d (%d)\n", overTime, nightOverTime)
-		fmt.Printf("Salary for the day: %.2f\n", overtimeSalary+config.DailySalary)
-		fmt.Println("\n=================================")
+	totalSpan := outMin - inMin
+	// Subtract 1 unpaid hour of break time (60 mins)
+	workedMinutes := totalSpan - 60
+	if workedMinutes < 0 {
+		workedMinutes = 0
 	}
 
-	/**------------------------------  REGULAR DAYS -----------------------------------------------------------***/
+	workedHours := workedMinutes / 60
+	remainMinutes := workedMinutes % 60
 
-	if !isRestDay && startTime >= "1800" && !isHoliday { // Night Shift With Over Time
-		nightShiftHours := calculateNightShiftHours(startTime, endTime) / 100
-		fmt.Println("=================================")
-		fmt.Printf("\nDaily Rate: %.2f\n", config.DailySalary)
-		fmt.Printf("Night Shift Hours Covered: %d hours\n", nightShiftHours)
-		nightShiftPay := float64(nightShiftHours)*config.DailySalary/float64(config.RegularWorkHours)*1.10 + config.DailySalary
-		fmt.Printf("Salary for the day: %.2f \n", nightShiftPay)
-		fmt.Println("\n=================================")
+	// Overtime calculation
+	totalOT := 0
+	if workedHours > config.RegularWorkHours {
+		totalOT = workedHours - config.RegularWorkHours
 	}
 
-	if !isRestDay && overTime <= 4 && startTime == "0900" && !isHoliday { // Regular Day with OT - Non-Night Shift
-		fmt.Println("=================================")
-		overtimeSalary := calculateOvertimeSalary(overTime, config.DailySalary/float64(config.RegularWorkHours), isNightShiftOT, nightOverTime, holidayType)
-		fmt.Printf("Daily Rate: %.2f\n", config.DailySalary)
-		fmt.Printf("Hours Overtime (Night Shift Overtime): %d (%d)\n", overTime, nightOverTime)
-		fmt.Printf("Salary for the day: %.2f\n", overtimeSalary+config.DailySalary)
-		fmt.Println("\n=================================")
+	dayOT := 0
+	nightOT := 0
+
+	if totalOT > 0 {
+		if totalOT <= 4 {
+			dayOT = totalOT
+			nightOT = 0
+		} else {
+			dayOT = 4
+			nightOT = totalOT - 4
+		}
 	}
 
-	if !isRestDay && overTime > 4 && startTime == "0900" && !isHoliday { // Regular Day with OT - Night Shift
-		isNightShiftOT = true
-		nightOverTime = overTime - 4
-		overTime = 4
-		overtimeSalary := calculateOvertimeSalary(overTime, config.DailySalary/float64(config.RegularWorkHours), isNightShiftOT, nightOverTime, holidayType)
-		fmt.Println("=================================")
-		fmt.Printf("Daily Rate: %.2f\n", config.DailySalary)
-		fmt.Printf("Hours Overtime (Night Shift Overtime): %d (%d)\n", overTime, nightOverTime)
-		fmt.Printf("Salary for the day: %.2f\n", overtimeSalary+config.DailySalary)
-		fmt.Println("\n=================================")
+	basePay := config.DailySalary * rates.BaseMultiplier
+	dayOTPay := float64(dayOT) * hourlyRate * rates.DayOTRate
+	nightOTPay := float64(nightOT) * hourlyRate * rates.NightOTRate
+
+	totalSalary := basePay + dayOTPay + nightOTPay
+
+	return DailyResult{
+		DayNumber:    day,
+		IsRestDay:    isRestDay,
+		IsAbsent:     false,
+		DayType:      dayKey,
+		WorkHours:    workedHours,
+		WorkMinutes:  remainMinutes,
+		DayOTHours:   dayOT,
+		NightOTHours: nightOT,
+		Salary:       totalSalary,
 	}
-
-}
-
-func calculateDuration(startTime, endTime string) (time.Duration, error) {
-	if !isValidTimeFormat(startTime) || !isValidTimeFormat(endTime) {
-		return 0, fmt.Errorf("invalid time format. Please enter time in HHMM format")
-	}
-
-	// Adjust the format to consider the case where OUT time is 0000
-	if endTime == "0000" {
-		endTime = "2359"
-	}
-
-	const timeFormat = "1504"
-
-	startTimeParsed, err := time.Parse(timeFormat, startTime)
-	if err != nil {
-		return 0, err
-	}
-
-	endTimeParsed, err := time.Parse(timeFormat, endTime)
-	if err != nil {
-		return 0, err
-	}
-
-	// Calculate the duration
-	duration := endTimeParsed.Sub(startTimeParsed)
-
-	return duration, nil
 }
 
 func main() {
 	config := Configuration{
-		DailySalary:      500,
+		DailySalary:      500.0,
 		RegularWorkHours: 8,
+		WorkdaysPerWeek:  5,
+		RestDaysPerWeek:  2,
 	}
+
+	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
 		fmt.Println("\nPayroll Menu")
-		fmt.Println("\n1. Generate Pay Roll")
-		fmt.Println("\n2. Generate Pay Roll")
+		fmt.Println("1. Generate Pay Roll")
+		fmt.Println("2. Update Work Hours / Settings")
 		fmt.Println("3. Exit")
-		fmt.Print("Select an option: ")
+		fmt.Print("Select Option: ")
 
-		var choice int
-		fmt.Scanln(&choice)
+		if !scanner.Scan() {
+			break
+		}
+		choiceStr := strings.TrimSpace(scanner.Text())
+		choice, err := strconv.Atoi(choiceStr)
+		if err != nil {
+			fmt.Println("Invalid input. Please enter a number.")
+			continue
+		}
 
 		switch choice {
 		case 1:
+			fmt.Println("\n---------------------------------")
+			fmt.Println("Generating Pay Roll....")
+			fmt.Println("---------------------------------")
 			fmt.Print("Enter Employee Name: ")
-			scanner := bufio.NewScanner(os.Stdin)
-			scanner.Scan()
-			employeeName := scanner.Text()
+			if !scanner.Scan() {
+				return
+			}
+			employeeName := strings.TrimSpace(scanner.Text())
 
-			for day := 5; day <= 7; day++ {
-				if day == 6 || day == 7 {
-					fmt.Printf("\n\nToday is Day %d (Rest Day)\n", day)
+			var dailyResults []DailyResult
+			totalSalary := 0.0
+			regularDaysPresent := 0
+			restDaysPresent := 0
+			totalDayOT := 0
+			totalNightOT := 0
+
+			totalDays := config.WorkdaysPerWeek + config.RestDaysPerWeek
+
+			for day := 1; day <= totalDays; day++ {
+				fmt.Println("---------------------------------")
+				isRestDay := day > config.WorkdaysPerWeek
+				if isRestDay {
+					fmt.Printf("DAY %d (REST DAY)\n", day)
 				} else {
-					fmt.Printf("\n\nToday is Day %d\n", day)
+					fmt.Printf("DAY %d\n", day)
 				}
-				fmt.Print("Is today a Holiday or Special-Non Working Holiday? (Y/N): ")
-				var holidayInput string
-				fmt.Scanln(&holidayInput)
-				holidayInput = strings.ToUpper(strings.TrimSpace(holidayInput))
+				fmt.Println("(if absent Enter 0900)")
 
-				var holidayType string // Declare holidayType here
-				if holidayInput == "Y" {
-					fmt.Print("Is it a Holiday (HD) or Special-Non Working Holiday (SNWH)? (HD/SNWH): ")
-					fmt.Scanln(&holidayType)
-					holidayType = strings.ToUpper(strings.TrimSpace(holidayType))
-
-					if holidayType != "HD" && holidayType != "SNWH" {
-						fmt.Println("Invalid holiday type. Please enter HD or SNWH.")
-						return
+				holidayType := ""
+				fmt.Print("Is today a Holiday? (Y/N): ")
+				if scanner.Scan() {
+					isHol := strings.ToUpper(strings.TrimSpace(scanner.Text()))
+					if isHol == "Y" {
+						fmt.Print("Enter Holiday Type (HD for Regular Holiday, SNWH for Special Non-Working): ")
+						if scanner.Scan() {
+							ht := strings.ToUpper(strings.TrimSpace(scanner.Text()))
+							if ht == "HD" || ht == "RH" {
+								holidayType = "RH"
+							} else if ht == "SNWH" || ht == "SNWD" {
+								holidayType = "SNWH"
+							}
+						}
 					}
 				}
 
-				fmt.Print("Enter IN Time (HHMM): ")
-				var startTime string
-				fmt.Scanln(&startTime)
-
-				fmt.Print("Enter OUT Time (HHMM): ")
-				var endTime string
-				fmt.Scanln(&endTime)
-
-				if !isValidTimeFormat(startTime) || !isValidTimeFormat(endTime) {
-					fmt.Println("Invalid time format. Please enter time in HHMM format.")
-					return
+				outTime := ""
+				for {
+					fmt.Print("Enter OUT Time (HHMM): ")
+					if !scanner.Scan() {
+						return
+					}
+					outTime = strings.TrimSpace(scanner.Text())
+					if isValidTimeFormat(outTime) {
+						break
+					}
+					fmt.Println("Invalid format. Please enter time as HHMM (e.g. 1700, 0900).")
 				}
-				generatePayroll(config, day, employeeName, startTime, endTime, holidayType)
+
+				res := calculateDayPayroll(config, day, "0900", outTime, holidayType)
+				dailyResults = append(dailyResults, res)
+				totalSalary += res.Salary
+				totalDayOT += res.DayOTHours
+				totalNightOT += res.NightOTHours
+
+				if !res.IsAbsent {
+					if res.IsRestDay {
+						restDaysPresent++
+					} else {
+						regularDaysPresent++
+					}
+				}
+
+				fmt.Printf("Salary for the day: %.2f\n", res.Salary)
 			}
+
+			// Weekly Payroll Summary
+			fmt.Println("---------------------------------")
+			fmt.Println()
+			fmt.Printf("\t%s's Weekly Payroll\n", employeeName)
+			fmt.Printf("Number of (Regular) Days Present\t\t%d\n", regularDaysPresent)
+			fmt.Printf("Number of (Rest) Days Present\t\t\t%d\n", restDaysPresent)
+			fmt.Printf("Total Hours Overtime (Night Shift Overtime)\t%d (%d)\n", totalDayOT+totalNightOT, totalNightOT)
+			fmt.Println("--------------------------------------------------------")
+			fmt.Printf("Total Salary for the Week\t\t\t%.2f\n", totalSalary)
+			fmt.Println()
+			fmt.Println("------ENTER 0 TO RETURN TO MENU---------")
+			scanner.Scan()
+
 		case 2:
-			fmt.Println("Exiting the system.")
+			fmt.Println("\n--- Configure Payroll Settings ---")
+			fmt.Printf("Current Daily Salary: %.2f\n", config.DailySalary)
+			fmt.Print("Enter new Daily Salary (or press Enter to keep current): ")
+			if scanner.Scan() {
+				val := strings.TrimSpace(scanner.Text())
+				if val != "" {
+					if s, err := strconv.ParseFloat(val, 64); err == nil && s > 0 {
+						config.DailySalary = s
+						fmt.Printf("Daily Salary updated to %.2f\n", config.DailySalary)
+					}
+				}
+			}
+
+			fmt.Printf("Current Regular Work Hours: %d\n", config.RegularWorkHours)
+			fmt.Print("Enter new Regular Work Hours (or press Enter to keep current): ")
+			if scanner.Scan() {
+				val := strings.TrimSpace(scanner.Text())
+				if val != "" {
+					if h, err := strconv.Atoi(val); err == nil && h > 0 {
+						config.RegularWorkHours = h
+						fmt.Printf("Regular Work Hours updated to %d\n", config.RegularWorkHours)
+					}
+				}
+			}
+
+		case 3:
+			fmt.Println("Exiting Weekly Payroll System. Goodbye!")
 			return
+
 		default:
-			fmt.Println("Invalid option. Please try again.")
+			fmt.Println("Invalid choice. Please select 1, 2, or 3.")
 		}
 	}
 }
